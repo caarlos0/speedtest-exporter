@@ -15,10 +15,16 @@ nfpms:
     maintainer: Carlos Becker <root@carlosbecker.dev>
     description: Exports Speedtest results to the Prometheus format
     formats:
+      - apk
       - deb
       - rpm
-    dependencies:
-      - speedtest
+    overrides:
+      deb:
+        dependencies:
+          - speedtest
+      rpm:
+        dependencies:
+          - speedtest
 brews:
 - tap:
     owner: caarlos0
