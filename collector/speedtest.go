@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
 	"time"
@@ -19,7 +20,8 @@ type speedtestCollector struct {
 
 	up                 *prometheus.Desc
 	scrapeDuration     *prometheus.Desc
-	pingSeconds        *prometheus.Desc
+	latencySeconds     *prometheus.Desc
+	jitterSeconds      *prometheus.Desc
 	downloadSpeedBytes *prometheus.Desc
 	uploadSpeedBytes   *prometheus.Desc
 	downloadedBytes    *prometheus.Desc
@@ -44,9 +46,15 @@ func NewSpeedtestCollector(cache *cache.Cache) prometheus.Collector {
 			nil,
 			nil,
 		),
-		pingSeconds: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "ping_seconds"),
-			"Latency",
+		latencySeconds: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, subsystem, "ping_latency_seconds"),
+			"Ping latency",
+			nil,
+			nil,
+		),
+		jitterSeconds: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, subsystem, "ping_jitter_seconds"),
+			"Ping jitter",
 			nil,
 			nil,
 		),
@@ -81,7 +89,8 @@ func NewSpeedtestCollector(cache *cache.Cache) prometheus.Collector {
 func (c *speedtestCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.up
 	ch <- c.scrapeDuration
-	ch <- c.pingSeconds
+	ch <- c.latencySeconds
+	ch <- c.jitterSeconds
 	ch <- c.downloadSpeedBytes
 	ch <- c.uploadSpeedBytes
 	ch <- c.downloadedBytes
@@ -106,11 +115,12 @@ func (c *speedtestCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Errorf("failed to collect: %s", err.Error())
 	}
 
-	ch <- prometheus.MustNewConstMetric(c.downloadSpeedBytes, prometheus.GaugeValue, result.Download)
-	ch <- prometheus.MustNewConstMetric(c.uploadSpeedBytes, prometheus.GaugeValue, result.Upload)
-	ch <- prometheus.MustNewConstMetric(c.pingSeconds, prometheus.GaugeValue, result.Ping/1000)
-	ch <- prometheus.MustNewConstMetric(c.uploadedBytes, prometheus.GaugeValue, result.BytesSent)
-	ch <- prometheus.MustNewConstMetric(c.downloadedBytes, prometheus.GaugeValue, result.BytesReceived)
+	ch <- prometheus.MustNewConstMetric(c.downloadSpeedBytes, prometheus.GaugeValue, result.Download.Bandwidth)
+	ch <- prometheus.MustNewConstMetric(c.uploadSpeedBytes, prometheus.GaugeValue, result.Upload.Bandwidth)
+	ch <- prometheus.MustNewConstMetric(c.latencySeconds, prometheus.GaugeValue, result.Ping.Latency/1000)
+	ch <- prometheus.MustNewConstMetric(c.jitterSeconds, prometheus.GaugeValue, result.Ping.Jitter/1000)
+	ch <- prometheus.MustNewConstMetric(c.uploadedBytes, prometheus.GaugeValue, result.Download.Bytes)
+	ch <- prometheus.MustNewConstMetric(c.downloadedBytes, prometheus.GaugeValue, result.Upload.Bytes)
 }
 
 func (c *speedtestCollector) cachedOrCollect() (SpeedtestResult, error) {
@@ -129,25 +139,72 @@ func (c *speedtestCollector) cachedOrCollect() (SpeedtestResult, error) {
 }
 
 func (c *speedtestCollector) collect() (SpeedtestResult, error) {
-	log.Debug("running speedtest-cli")
+	log.Debug("running speedtest")
 	var out bytes.Buffer
-	cmd := exec.Command("speedtest-cli", "--json")
+	cmd := exec.Command("speedtest", "--accept-license", "--accept-gdpr", "--format", "json", "--unit", "bps")
 	cmd.Stdout = &out
+	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return SpeedtestResult{}, fmt.Errorf("speedtest-cli failed: %w", err)
+		return SpeedtestResult{}, fmt.Errorf("speedtest failed: %w", err)
 	}
-	log.Debug("speedtest-cli result: " + out.String())
+	log.Debug("speedtest result: " + out.String())
 	var result SpeedtestResult
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		return SpeedtestResult{}, fmt.Errorf("failed to decode speedtest-cli output: %w", err)
+		return SpeedtestResult{}, fmt.Errorf("failed to decode speedtest output: %w", err)
 	}
+	log.Info("recorded " + result.Result.URL)
 	return result, nil
 }
 
 type SpeedtestResult struct {
-	Download      float64 `json:"download"`
-	Upload        float64 `json:"upload"`
-	Ping          float64 `json:"ping"`
-	BytesSent     float64 `json:"bytes_sent"`
-	BytesReceived float64 `json:"bytes_received"`
+	Type       string    `json:"type"`
+	Timestamp  time.Time `json:"timestamp"`
+	Ping       Ping      `json:"ping"`
+	Download   Download  `json:"download"`
+	Upload     Upload    `json:"upload"`
+	PacketLoss int       `json:"packetLoss"`
+	Isp        string    `json:"isp"`
+	Interface  Interface `json:"interface"`
+	Server     Server    `json:"server"`
+	Result     Result    `json:"result"`
+}
+
+type Ping struct {
+	Jitter  float64 `json:"jitter"`
+	Latency float64 `json:"latency"`
+}
+
+type Download struct {
+	Bandwidth float64 `json:"bandwidth"`
+	Bytes     float64 `json:"bytes"`
+	Elapsed   float64 `json:"elapsed"`
+}
+
+type Upload struct {
+	Bandwidth float64 `json:"bandwidth"`
+	Bytes     float64 `json:"bytes"`
+	Elapsed   float64 `json:"elapsed"`
+}
+
+type Interface struct {
+	InternalIP string `json:"internalIp"`
+	Name       string `json:"name"`
+	MacAddr    string `json:"macAddr"`
+	IsVpn      bool   `json:"isVpn"`
+	ExternalIP string `json:"externalIp"`
+}
+
+type Server struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	Location string `json:"location"`
+	Country  string `json:"country"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	IP       string `json:"ip"`
+}
+
+type Result struct {
+	ID  string `json:"id"`
+	URL string `json:"url"`
 }
