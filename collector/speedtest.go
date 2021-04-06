@@ -18,73 +18,72 @@ type speedtestCollector struct {
 	mutex sync.Mutex
 	cache *cache.Cache
 
-	up                 *prometheus.Desc
-	scrapeDuration     *prometheus.Desc
-	latencySeconds     *prometheus.Desc
-	jitterSeconds      *prometheus.Desc
-	downloadSpeedBytes *prometheus.Desc
-	uploadSpeedBytes   *prometheus.Desc
-	downloadedBytes    *prometheus.Desc
-	uploadedBytes      *prometheus.Desc
-	packetLossPct      *prometheus.Desc
+	up              *prometheus.Desc
+	scrapeDuration  *prometheus.Desc
+	latencySeconds  *prometheus.Desc
+	jitterSeconds   *prometheus.Desc
+	downloadBps     *prometheus.Desc
+	uploadBps       *prometheus.Desc
+	downloadedBytes *prometheus.Desc
+	uploadedBytes   *prometheus.Desc
+	packetLossPct   *prometheus.Desc
 }
 
 // NewSpeedtestCollector returns a releases collector
 func NewSpeedtestCollector(cache *cache.Cache) prometheus.Collector {
 	const namespace = "speedtest"
-	const subsystem = ""
 	return &speedtestCollector{
 		cache: cache,
 		up: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "up"),
+			prometheus.BuildFQName(namespace, "", "up"),
 			"Exporter is being able to talk with GitHub API",
 			nil,
 			nil,
 		),
 		scrapeDuration: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "scrape_duration_seconds"),
+			prometheus.BuildFQName(namespace, "", "scrape_duration_seconds"),
 			"Returns how long the probe took to complete in seconds",
 			nil,
 			nil,
 		),
 		latencySeconds: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "ping_latency_seconds"),
+			prometheus.BuildFQName(namespace, "ping", "latency_seconds"),
 			"Ping latency",
 			nil,
 			nil,
 		),
 		jitterSeconds: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "ping_jitter_seconds"),
+			prometheus.BuildFQName(namespace, "ping", "jitter_seconds"),
 			"Ping jitter",
 			nil,
 			nil,
 		),
-		downloadSpeedBytes: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "download_speed_bytes"),
+		downloadBps: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "download", "bps"),
 			"Download speed",
 			nil,
 			nil,
 		),
-		uploadSpeedBytes: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "upload_speed_bytes"),
+		uploadBps: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "upload", "bps"),
 			"Upload speed",
 			nil,
 			nil,
 		),
 		downloadedBytes: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "downloaded_bytes"),
+			prometheus.BuildFQName(namespace, "download", "bytes"),
 			"Downloaded bytes",
 			nil,
 			nil,
 		),
 		uploadedBytes: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "uploaded_bytes"),
+			prometheus.BuildFQName(namespace, "upload", "bytes"),
 			"Uploaded bytes",
 			nil,
 			nil,
 		),
 		packetLossPct: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, subsystem, "packet_loss_pct"),
+			prometheus.BuildFQName(namespace, "", "packet_loss_pct"),
 			"Packet loss percentage",
 			nil,
 			nil,
@@ -98,8 +97,8 @@ func (c *speedtestCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.scrapeDuration
 	ch <- c.latencySeconds
 	ch <- c.jitterSeconds
-	ch <- c.downloadSpeedBytes
-	ch <- c.uploadSpeedBytes
+	ch <- c.downloadBps
+	ch <- c.uploadBps
 	ch <- c.downloadedBytes
 	ch <- c.uploadedBytes
 	ch <- c.packetLossPct
@@ -123,8 +122,8 @@ func (c *speedtestCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Errorf("failed to collect: %s", err.Error())
 	}
 
-	ch <- prometheus.MustNewConstMetric(c.downloadSpeedBytes, prometheus.GaugeValue, result.Download.Bandwidth)
-	ch <- prometheus.MustNewConstMetric(c.uploadSpeedBytes, prometheus.GaugeValue, result.Upload.Bandwidth)
+	ch <- prometheus.MustNewConstMetric(c.downloadBps, prometheus.GaugeValue, result.Download.Bandwidth)
+	ch <- prometheus.MustNewConstMetric(c.uploadBps, prometheus.GaugeValue, result.Upload.Bandwidth)
 	ch <- prometheus.MustNewConstMetric(c.latencySeconds, prometheus.GaugeValue, result.Ping.Latency/1000)
 	ch <- prometheus.MustNewConstMetric(c.jitterSeconds, prometheus.GaugeValue, result.Ping.Jitter/1000)
 	ch <- prometheus.MustNewConstMetric(c.uploadedBytes, prometheus.GaugeValue, result.Download.Bytes)
