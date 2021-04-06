@@ -26,6 +26,7 @@ type speedtestCollector struct {
 	uploadSpeedBytes   *prometheus.Desc
 	downloadedBytes    *prometheus.Desc
 	uploadedBytes      *prometheus.Desc
+	packetLossPct      *prometheus.Desc
 }
 
 // NewSpeedtestCollector returns a releases collector
@@ -82,6 +83,12 @@ func NewSpeedtestCollector(cache *cache.Cache) prometheus.Collector {
 			nil,
 			nil,
 		),
+		packetLossPct: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, subsystem, "packet_loss_pct"),
+			"Packet loss percentage",
+			nil,
+			nil,
+		),
 	}
 }
 
@@ -95,6 +102,7 @@ func (c *speedtestCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.uploadSpeedBytes
 	ch <- c.downloadedBytes
 	ch <- c.uploadedBytes
+	ch <- c.packetLossPct
 }
 
 // Collect all metrics
@@ -121,6 +129,7 @@ func (c *speedtestCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(c.jitterSeconds, prometheus.GaugeValue, result.Ping.Jitter/1000)
 	ch <- prometheus.MustNewConstMetric(c.uploadedBytes, prometheus.GaugeValue, result.Download.Bytes)
 	ch <- prometheus.MustNewConstMetric(c.downloadedBytes, prometheus.GaugeValue, result.Upload.Bytes)
+	ch <- prometheus.MustNewConstMetric(c.packetLossPct, prometheus.GaugeValue, result.PacketLoss)
 }
 
 func (c *speedtestCollector) cachedOrCollect() (SpeedtestResult, error) {
@@ -162,7 +171,7 @@ type SpeedtestResult struct {
 	Ping       Ping      `json:"ping"`
 	Download   Download  `json:"download"`
 	Upload     Upload    `json:"upload"`
-	PacketLoss int       `json:"packetLoss"`
+	PacketLoss float64   `json:"packetLoss"`
 	Isp        string    `json:"isp"`
 	Interface  Interface `json:"interface"`
 	Server     Server    `json:"server"`
