@@ -22,8 +22,8 @@ type speedtestCollector struct {
 	scrapeDuration  *prometheus.Desc
 	latencySeconds  *prometheus.Desc
 	jitterSeconds   *prometheus.Desc
-	downloadBps     *prometheus.Desc
-	uploadBps       *prometheus.Desc
+	downloadBytes   *prometheus.Desc
+	uploadBytes     *prometheus.Desc
 	downloadedBytes *prometheus.Desc
 	uploadedBytes   *prometheus.Desc
 	packetLossPct   *prometheus.Desc
@@ -58,15 +58,15 @@ func NewSpeedtestCollector(cache *cache.Cache) prometheus.Collector {
 			nil,
 			nil,
 		),
-		downloadBps: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "download", "bps"),
-			"Download speed",
+		downloadBytes: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "download", "bytes_second"),
+			"Download speed in B/s",
 			nil,
 			nil,
 		),
-		uploadBps: prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "upload", "bps"),
-			"Upload speed",
+		uploadBytes: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "upload", "bytes_second"),
+			"Upload speed in B/s",
 			nil,
 			nil,
 		),
@@ -97,8 +97,8 @@ func (c *speedtestCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.scrapeDuration
 	ch <- c.latencySeconds
 	ch <- c.jitterSeconds
-	ch <- c.downloadBps
-	ch <- c.uploadBps
+	ch <- c.downloadBytes
+	ch <- c.uploadBytes
 	ch <- c.downloadedBytes
 	ch <- c.uploadedBytes
 	ch <- c.packetLossPct
@@ -122,8 +122,8 @@ func (c *speedtestCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Errorf("failed to collect: %s", err.Error())
 	}
 
-	ch <- prometheus.MustNewConstMetric(c.downloadBps, prometheus.GaugeValue, result.Download.Bandwidth)
-	ch <- prometheus.MustNewConstMetric(c.uploadBps, prometheus.GaugeValue, result.Upload.Bandwidth)
+	ch <- prometheus.MustNewConstMetric(c.downloadBytes, prometheus.GaugeValue, result.Download.Bandwidth)
+	ch <- prometheus.MustNewConstMetric(c.uploadBytes, prometheus.GaugeValue, result.Upload.Bandwidth)
 	ch <- prometheus.MustNewConstMetric(c.latencySeconds, prometheus.GaugeValue, result.Ping.Latency/1000)
 	ch <- prometheus.MustNewConstMetric(c.jitterSeconds, prometheus.GaugeValue, result.Ping.Jitter/1000)
 	ch <- prometheus.MustNewConstMetric(c.uploadedBytes, prometheus.GaugeValue, result.Download.Bytes)
@@ -149,7 +149,7 @@ func (c *speedtestCollector) cachedOrCollect() (SpeedtestResult, error) {
 func (c *speedtestCollector) collect() (SpeedtestResult, error) {
 	log.Debug("running speedtest")
 	var out bytes.Buffer
-	cmd := exec.Command("speedtest", "--accept-license", "--accept-gdpr", "--format", "json", "--unit", "bps")
+	cmd := exec.Command("speedtest", "--accept-license", "--accept-gdpr", "--format", "json", "--unit", "B/s")
 	cmd.Stdout = &out
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
