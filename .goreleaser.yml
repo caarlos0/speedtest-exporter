@@ -16,7 +16,6 @@ nfpms:
     description: Exports Speedtest results to the Prometheus format
     formats:
       - deb
-      - apk
       - rpm
     dependencies:
       - speedtest
