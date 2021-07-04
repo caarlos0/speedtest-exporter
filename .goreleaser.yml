@@ -1,19 +1,22 @@
+variables:
+  homepage: https://github.com/caarlos0/speedtest-exporter
+  description: Exports Speedtest results to the Prometheus for
+includes:
+  - from_url:
+      url: https://raw.githubusercontent.com/caarlos0/goreleaserfiles/main/build.yml
+  - from_url:
+      url: https://raw.githubusercontent.com/caarlos0/goreleaserfiles/main/release.yml
+  - from_url:
+      url: https://raw.githubusercontent.com/caarlos0/goreleaserfiles/main/podman.yml
+
 before:
   hooks:
     - go mod tidy
-gomod:
-  proxy: true
-build:
-  goarch:
-    - amd64
-    - arm64
-  env:
-    - CGO_ENABLED=0
 nfpms:
   - vendor: Becker Software LTDA
-    homepage: https://carlosbecker.com
+    homepage: '{{ .homepage }}'
     maintainer: Carlos Becker <root@carlosbecker.dev>
-    description: Exports Speedtest results to the Prometheus format
+    description: '{{ .description }}'
     formats:
       - apk
       - deb
@@ -30,55 +33,7 @@ brews:
     owner: caarlos0
     name: homebrew-tap
   folder: Formula
-  description: Exports Speedtest results to the Prometheus format
+  description: '{{ .description }}'
+  homepage: '{{ .homepage }}'
   dependencies:
     - name: speedtest
-checksum:
-  name_template: '{{ .ProjectName }}_checksums.txt'
-archives:
-- name_template: '{{ .Binary }}_{{ .Os }}_{{ .Arch }}'
-dockers:
-- image_templates:
-  - 'ghcr.io/caarlos0/speedtest-exporter:{{ .Tag }}-amd64'
-  - 'caarlos0/speedtest-exporter:{{ .Tag }}-amd64'
-  dockerfile: Dockerfile
-  use_buildx: true
-  build_flag_templates:
-  - "--pull"
-  - "--label=org.opencontainers.image.created={{.Date}}"
-  - "--label=org.opencontainers.image.name={{.ProjectName}}"
-  - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-  - "--label=org.opencontainers.image.version={{.Version}}"
-  - "--label=org.opencontainers.image.source=https://github.com/caarlos0/speedtest-exporter"
-  - "--platform=linux/amd64"
-- image_templates:
-  - 'ghcr.io/caarlos0/speedtest-exporter:{{ .Tag }}-arm64'
-  - 'caarlos0/speedtest-exporter:{{ .Tag }}-arm64'
-  dockerfile: Dockerfile
-  use_buildx: true
-  build_flag_templates:
-  - "--pull"
-  - "--label=org.opencontainers.image.created={{.Date}}"
-  - "--label=org.opencontainers.image.name={{.ProjectName}}"
-  - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-  - "--label=org.opencontainers.image.version={{.Version}}"
-  - "--label=org.opencontainers.image.source=https://github.com/caarlos0/speedtest-exporter"
-  - "--platform=linux/arm64"
-  goarch: arm64
-docker_manifests:
-- name_template: 'ghcr.io/caarlos0/speedtest-exporter:{{ .Tag }}'
-  image_templates:
-  - 'ghcr.io/caarlos0/speedtest-exporter:{{ .Tag }}-amd64'
-  - 'ghcr.io/caarlos0/speedtest-exporter:{{ .Tag }}-arm64'
-- name_template: 'ghcr.io/caarlos0/speedtest-exporter:latest'
-  image_templates:
-  - 'ghcr.io/caarlos0/speedtest-exporter:{{ .Tag }}-amd64'
-  - 'ghcr.io/caarlos0/speedtest-exporter:{{ .Tag }}-arm64'
-- name_template: 'caarlos0/speedtest-exporter:{{ .Tag }}'
-  image_templates:
-  - 'caarlos0/speedtest-exporter:{{ .Tag }}-amd64'
-  - 'caarlos0/speedtest-exporter:{{ .Tag }}-arm64'
-- name_template: 'caarlos0/speedtest-exporter:latest'
-  image_templates:
-  - 'caarlos0/speedtest-exporter:{{ .Tag }}-amd64'
-  - 'caarlos0/speedtest-exporter:{{ .Tag }}-arm64'
