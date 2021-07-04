@@ -15,7 +15,7 @@ before:
 nfpms:
   - vendor: Becker Software LTDA
     homepage: '{{ .homepage }}'
-    maintainer: Carlos Becker <root@carlosbecker.dev>
+    maintainer: Carlos Alexandro Becker <carlos@becker.software>
     description: '{{ .description }}'
     formats:
       - apk
@@ -37,3 +37,6 @@ brews:
   homepage: '{{ .homepage }}'
   dependencies:
     - name: speedtest
+
+furies:
+- account: caarlos0
