@@ -1,6 +1,6 @@
 variables:
   homepage: https://github.com/caarlos0/speedtest-exporter
-  description: Exports Speedtest results to the Prometheus for
+  description: Exports Speedtest results to the Prometheus format
 includes:
   - from_url:
       url: https://raw.githubusercontent.com/caarlos0/goreleaserfiles/main/build.yml
