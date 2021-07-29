@@ -9,3 +9,9 @@ Exports [Speedtest CLI](https://www.speedtest.net/apps/cli) metrics in the prome
 
 - [Grafana Dashboard](https://grafana.com/grafana/dashboards/14187)
 - [Installing speedtest CLI](https://www.speedtest.net/apps/cli)
+
+
+## Stargazers over time
+
+[![Stargazers over time](https://starchart.cc/caarlos0/speedtest-exporter.svg)](https://starchart.cc/caarlos0/speedtest-exporter)
+
