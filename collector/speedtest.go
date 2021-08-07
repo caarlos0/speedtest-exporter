@@ -36,7 +36,7 @@ func NewSpeedtestCollector(cache *cache.Cache) prometheus.Collector {
 		cache: cache,
 		up: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "up"),
-			"Exporter is being able to talk with GitHub API",
+			"Whether using speedtest-cli is succeeding or not",
 			nil,
 			nil,
 		),
