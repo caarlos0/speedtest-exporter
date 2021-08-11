@@ -7,8 +7,6 @@ includes:
   - from_url:
       url: https://raw.githubusercontent.com/caarlos0/goreleaserfiles/main/build.yml
   - from_url:
-      url: https://raw.githubusercontent.com/caarlos0/goreleaserfiles/main/package.yml
-  - from_url:
       url: https://raw.githubusercontent.com/caarlos0/goreleaserfiles/main/release.yml
   - from_url:
       url: https://raw.githubusercontent.com/caarlos0/goreleaserfiles/main/docker.yml
@@ -18,16 +16,29 @@ before:
     - go mod tidy
 
 nfpms:
-- overrides:
-    deb:
-      dependencies:
-        - speedtest
-    rpm:
-      dependencies:
-        - speedtest
-
+  - vendor: Becker Software LTDA
+    homepage: '{{ .homepage }}'
+    maintainer: Carlos Alexandro Becker <carlos@becker.software>
+    description: '{{ .description }}'
+    formats:
+      - apk
+      - deb
+      - rpm
+    overrides:
+      deb:
+        dependencies:
+          - speedtest
+      rpm:
+        dependencies:
+          - speedtest
 brews:
-- dependencies:
+- tap:
+    owner: caarlos0
+    name: homebrew-tap
+  folder: Formula
+  description: '{{ .description }}'
+  homepage: '{{ .homepage }}'
+  dependencies:
     - name: speedtest
 
 furies:
