@@ -23,17 +23,16 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Log in to docker.io
-        uses: redhat-actions/podman-login@v1
+        uses: docker/login-action@v1
         with:
           username: caarlos0
           password: ${{ secrets.DOCKER_PASSWORD }}
-          registry: docker.io
       - name: Log in to ghcr.io
-        uses: redhat-actions/podman-login@v1
+        uses: docker/login-action@v1
         with:
+          registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GH_PAT }}
-          registry: ghcr.io
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:

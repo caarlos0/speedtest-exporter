@@ -9,7 +9,7 @@ includes:
   - from_url:
       url: https://raw.githubusercontent.com/caarlos0/goreleaserfiles/main/release.yml
   - from_url:
-      url: https://raw.githubusercontent.com/caarlos0/goreleaserfiles/main/podman.yml
+      url: https://raw.githubusercontent.com/caarlos0/goreleaserfiles/main/docker.yml
 
 before:
   hooks:
