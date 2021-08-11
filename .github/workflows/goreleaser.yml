@@ -32,7 +32,7 @@ jobs:
         uses: redhat-actions/podman-login@v1
         with:
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GH_PAT }}
           registry: ghcr.io
       -
         name: Run GoReleaser
