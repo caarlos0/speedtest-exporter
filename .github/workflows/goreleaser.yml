@@ -12,16 +12,16 @@ jobs:
   goreleaser:
     runs-on: ubuntu-latest
     steps:
-      -
-        name: Checkout
+      - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      -
-        name: Set up Go
+      - name: Set up Go
         uses: actions/setup-go@v2
         with:
           go-version: ~1.16
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
       - name: Log in to docker.io
         uses: redhat-actions/podman-login@v1
         with:
@@ -34,8 +34,7 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GH_PAT }}
           registry: ghcr.io
-      -
-        name: Run GoReleaser
+      - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:
           distribution: goreleaser-pro
