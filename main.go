@@ -37,7 +37,7 @@ func main() {
 		log.Debug().Msg("enabled debug mode")
 	}
 
-	log.Info().Msgf("starting speedtest-exporter %s")
+	log.Info().Msgf("starting speedtest-exporter %s", version)
 	prometheus.MustRegister(collector.NewSpeedtestCollector(cache.New(*interval, *interval)))
 	http.Handle("/metrics", promhttp.Handler())
 
