@@ -188,12 +188,13 @@ func (c *speedtestCollector) cachedOrCollect() (SpeedtestResult, error) {
 
 func (c *speedtestCollector) collect() (SpeedtestResult, error) {
 	log.Debug().Msg("running speedtest")
-	var cmd *exec.Cmd
+
+	cmdParams := []string{"--accept-license", "--accept-gdpr", "--format", "json", "--unit", "B/s"}
 	if c.serverID != "" {
-		cmd = exec.Command("speedtest", "--accept-license", "--accept-gdpr", "--format", "json", "--unit", "B/s", "-s", c.serverID)
-	} else {
-		cmd = exec.Command("speedtest", "--accept-license", "--accept-gdpr", "--format", "json", "--unit", "B/s")
+		cmdParams = append(cmdParams, "-s", c.serverID)
 	}
+
+	cmd := exec.Command("speedtest", cmdParams...)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = os.Stderr
