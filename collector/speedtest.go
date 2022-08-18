@@ -27,12 +27,33 @@ type speedtestCollector struct {
 	downloadedBytes *prometheus.Desc
 	uploadedBytes   *prometheus.Desc
 	packetLossPct   *prometheus.Desc
+
+	serverID         string
+	showServerLabels bool
 }
 
 // NewSpeedtestCollector returns a releases collector
+// Preserved for backwards compatibility
 func NewSpeedtestCollector(cache *cache.Cache) prometheus.Collector {
+	return NewSpeedtestCollectorWithOpts(cache, SpeedtestOpts{})
+}
+
+// Use an Opts struct to enable future extensions to this if needed
+type SpeedtestOpts struct {
+	Server           string
+	ShowServerLabels bool
+}
+
+// NewSpeedtestCollectorWithOpts returns a collector, with a specified ServerID
+func NewSpeedtestCollectorWithOpts(cache *cache.Cache, opts SpeedtestOpts) prometheus.Collector {
 	const namespace = "speedtest"
-	return &speedtestCollector{
+
+	var labels []string
+	if opts.ShowServerLabels {
+		labels = []string{"server_name", "server_location", "server_country", "server_host"}
+	}
+
+	collector := &speedtestCollector{
 		cache: cache,
 		up: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "up"),
@@ -49,46 +70,55 @@ func NewSpeedtestCollector(cache *cache.Cache) prometheus.Collector {
 		latencySeconds: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "ping", "latency_seconds"),
 			"Ping latency",
-			nil,
+			labels,
 			nil,
 		),
 		jitterSeconds: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "ping", "jitter_seconds"),
 			"Ping jitter",
-			nil,
+			labels,
 			nil,
 		),
 		downloadBytes: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "download", "bytes_second"),
 			"Download speed in B/s",
-			nil,
+			labels,
 			nil,
 		),
 		uploadBytes: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "upload", "bytes_second"),
 			"Upload speed in B/s",
-			nil,
+			labels,
 			nil,
 		),
 		downloadedBytes: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "download", "bytes"),
 			"Downloaded bytes",
-			nil,
+			labels,
 			nil,
 		),
 		uploadedBytes: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "upload", "bytes"),
 			"Uploaded bytes",
-			nil,
+			labels,
 			nil,
 		),
 		packetLossPct: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "", "packet_loss_pct"),
 			"Packet loss percentage",
-			nil,
+			labels,
 			nil,
 		),
 	}
+
+	collector.showServerLabels = opts.ShowServerLabels
+
+	if opts.Server != "" {
+		collector.serverID = opts.Server
+	}
+
+	return collector
+
 }
 
 // Describe all metrics
@@ -122,13 +152,23 @@ func (c *speedtestCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Error().Err(err).Msg("failed to collect")
 	}
 
-	ch <- prometheus.MustNewConstMetric(c.downloadBytes, prometheus.GaugeValue, result.Download.Bandwidth)
-	ch <- prometheus.MustNewConstMetric(c.uploadBytes, prometheus.GaugeValue, result.Upload.Bandwidth)
-	ch <- prometheus.MustNewConstMetric(c.latencySeconds, prometheus.GaugeValue, result.Ping.Latency/1000)
-	ch <- prometheus.MustNewConstMetric(c.jitterSeconds, prometheus.GaugeValue, result.Ping.Jitter/1000)
-	ch <- prometheus.MustNewConstMetric(c.uploadedBytes, prometheus.GaugeValue, result.Download.Bytes)
-	ch <- prometheus.MustNewConstMetric(c.downloadedBytes, prometheus.GaugeValue, result.Upload.Bytes)
-	ch <- prometheus.MustNewConstMetric(c.packetLossPct, prometheus.GaugeValue, result.PacketLoss)
+	var labels []string
+	if c.showServerLabels {
+		labels = []string{
+			result.Server.Name,
+			result.Server.Location,
+			result.Server.Country,
+			result.Server.Host,
+		}
+	}
+
+	ch <- prometheus.MustNewConstMetric(c.downloadBytes, prometheus.GaugeValue, result.Download.Bandwidth, labels...)
+	ch <- prometheus.MustNewConstMetric(c.uploadBytes, prometheus.GaugeValue, result.Upload.Bandwidth, labels...)
+	ch <- prometheus.MustNewConstMetric(c.latencySeconds, prometheus.GaugeValue, result.Ping.Latency/1000, labels...)
+	ch <- prometheus.MustNewConstMetric(c.jitterSeconds, prometheus.GaugeValue, result.Ping.Jitter/1000, labels...)
+	ch <- prometheus.MustNewConstMetric(c.uploadedBytes, prometheus.GaugeValue, result.Download.Bytes, labels...)
+	ch <- prometheus.MustNewConstMetric(c.downloadedBytes, prometheus.GaugeValue, result.Upload.Bytes, labels...)
+	ch <- prometheus.MustNewConstMetric(c.packetLossPct, prometheus.GaugeValue, result.PacketLoss, labels...)
 }
 
 func (c *speedtestCollector) cachedOrCollect() (SpeedtestResult, error) {
@@ -148,8 +188,13 @@ func (c *speedtestCollector) cachedOrCollect() (SpeedtestResult, error) {
 
 func (c *speedtestCollector) collect() (SpeedtestResult, error) {
 	log.Debug().Msg("running speedtest")
+	var cmd *exec.Cmd
+	if c.serverID != "" {
+		cmd = exec.Command("speedtest", "--accept-license", "--accept-gdpr", "--format", "json", "--unit", "B/s", "-s", c.serverID)
+	} else {
+		cmd = exec.Command("speedtest", "--accept-license", "--accept-gdpr", "--format", "json", "--unit", "B/s")
+	}
 	var out bytes.Buffer
-	cmd := exec.Command("speedtest", "--accept-license", "--accept-gdpr", "--format", "json", "--unit", "B/s")
 	cmd.Stdout = &out
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
