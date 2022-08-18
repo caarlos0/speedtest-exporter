@@ -42,19 +42,18 @@ func main() {
 
 	if *server != "" {
 		log.Info().Msgf("starting speedtest-exporter %s with server %s", version, *server)
-		prometheus.MustRegister(
-			collector.NewSpeedtestCollectorWithOpts(
-				cache.New(*interval, *interval),
-				collector.SpeedtestOpts{
-					Server:           *server,
-					ShowServerLabels: *serverLabels,
-				},
-			),
-		)
 	} else {
 		log.Info().Msgf("starting speedtest-exporter %s", version)
-		prometheus.MustRegister(collector.NewSpeedtestCollector(cache.New(*interval, *interval)))
 	}
+	prometheus.MustRegister(
+		collector.NewSpeedtestCollectorWithOpts(
+			cache.New(*interval, *interval),
+			collector.SpeedtestOpts{
+				Server:           *server,
+				ShowServerLabels: *serverLabels,
+			},
+		),
+	)
 
 	http.Handle("/metrics", promhttp.Handler())
 
