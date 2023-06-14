@@ -16,11 +16,14 @@ import (
 
 // nolint: gochecknoglobals
 var (
-	bind     = kingpin.Flag("bind", "addr to bind the server").Short('b').Default(":9876").String()
-	debug    = kingpin.Flag("debug", "show debug logs").Default("false").Bool()
-	format   = kingpin.Flag("logFormat", "log format to use").Default("console").Enum("json", "console")
-	interval = kingpin.Flag("refresh.interval", "time between refreshes with speedtest").Default("30m").Duration()
-	version  = "master"
+	bind         = kingpin.Flag("bind", "addr to bind the server").Short('b').Default(":9876").String()
+	debug        = kingpin.Flag("debug", "show debug logs").Default("false").Bool()
+	format       = kingpin.Flag("logFormat", "log format to use").Default("console").Enum("json", "console")
+	interval     = kingpin.Flag("refresh.interval", "time between refreshes with speedtest").Default("30m").Duration()
+	server       = kingpin.Flag("server", "speedtest server id").Short('s').Default("").String()
+	serverLabels = kingpin.Flag("showServerLabels", "whether or not to annotate speedtest results with details of the server").Default("false").Bool()
+
+	version = "master"
 )
 
 func main() {
@@ -37,8 +40,21 @@ func main() {
 		log.Debug().Msg("enabled debug mode")
 	}
 
-	log.Info().Msgf("starting speedtest-exporter %s", version)
-	prometheus.MustRegister(collector.NewSpeedtestCollector(cache.New(*interval, *interval)))
+	if *server != "" {
+		log.Info().Msgf("starting speedtest-exporter %s with server %s", version, *server)
+	} else {
+		log.Info().Msgf("starting speedtest-exporter %s", version)
+	}
+	prometheus.MustRegister(
+		collector.NewSpeedtestCollectorWithOpts(
+			cache.New(*interval, *interval),
+			collector.SpeedtestOpts{
+				Server:           *server,
+				ShowServerLabels: *serverLabels,
+			},
+		),
+	)
+
 	http.Handle("/metrics", promhttp.Handler())
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
