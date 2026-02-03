@@ -4,15 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/exec"
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/rs/zerolog/log"
 )
 
 type speedtestCollector struct {
@@ -154,7 +153,7 @@ func (c *speedtestCollector) Collect(ch chan<- prometheus.Metric) {
 	result, err := c.cachedOrCollect()
 	if err != nil {
 		success = 0
-		log.Error().Err(err).Msg("failed to collect")
+		log.Error("failed to collect", "err", err)
 	}
 
 	var labels []string
@@ -200,12 +199,12 @@ func (c *speedtestCollector) cachedOrCollect() (SpeedtestResult, error) {
 			}()
 
 			if _, err := c.collectAndCache(); err != nil {
-				slog.Error("failed to update cache in background")
+				log.Error("failed to update cache in background", "err", err)
 			}
 		}()
 	}
 
-	slog.Debug("returning results from cache")
+	log.Debug("returning results from cache")
 	return res, nil
 }
 
@@ -219,7 +218,7 @@ func (c *speedtestCollector) collectAndCache() (SpeedtestResult, error) {
 }
 
 func (c *speedtestCollector) collect() (SpeedtestResult, error) {
-	slog.Debug("running speedtest")
+	log.Debug("running speedtest")
 
 	cmdParams := []string{"--accept-license", "--accept-gdpr", "--format", "json", "--unit", "B/s"}
 	if c.serverID != "" {
@@ -233,12 +232,12 @@ func (c *speedtestCollector) collect() (SpeedtestResult, error) {
 	if err := cmd.Run(); err != nil {
 		return SpeedtestResult{}, fmt.Errorf("speedtest failed: %w", err)
 	}
-	slog.Debug("speedtest result", "output", out.String())
+	log.Debugf("speedtest result: %s", out.String())
 	var result SpeedtestResult
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
 		return SpeedtestResult{}, fmt.Errorf("failed to decode speedtest output: %w", err)
 	}
-	slog.Info("recorded speedtest result", "url", result.Result.URL)
+	log.Infof("recorded %s", result.Result.URL)
 	return result, nil
 }
 

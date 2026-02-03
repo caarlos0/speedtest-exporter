@@ -2,17 +2,14 @@ package main
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
-	"os"
 
 	"github.com/alecthomas/kingpin"
 	"github.com/caarlos0/speedtest-exporter/collector"
+	"github.com/charmbracelet/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 // nolint: gochecknoglobals
@@ -32,19 +29,20 @@ func main() {
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	if *format == "console" {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log.SetLevel(log.InfoLevel)
+	if *format == "json" {
+		log.SetFormatter(log.JSONFormatter)
 	}
+
 	if *debug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-		slog.Debug("enabled debug mode")
+		log.SetLevel(log.DebugLevel)
+		log.Debug("enabled debug mode")
 	}
 
 	if *server != "" {
-		slog.Info("starting speedtest-exporter", "version", version, "server", *server)
+		log.Infof("starting speedtest-exporter %s with server %s", version, *server)
 	} else {
-		slog.Info("starting speedtest-exporter", "version", version)
+		log.Infof("starting speedtest-exporter %s", version)
 	}
 	prometheus.MustRegister(
 		collector.NewSpeedtestCollectorWithOpts(
@@ -72,8 +70,8 @@ func main() {
 			`,
 		)
 	})
-	slog.Info("listening on", "bind", *bind)
+	log.Infof("listening on %s", *bind)
 	if err := http.ListenAndServe(*bind, nil); err != nil {
-		slog.Error("error starting server")
+		log.Fatal("error starting server", "err", err)
 	}
 }
