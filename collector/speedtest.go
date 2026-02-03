@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"sync"
@@ -30,6 +31,8 @@ type speedtestCollector struct {
 
 	serverID         string
 	showServerLabels bool
+	interval         time.Duration
+	updating         bool // effectively a mutex for background updates
 }
 
 // NewSpeedtestCollector returns a releases collector
@@ -42,6 +45,7 @@ func NewSpeedtestCollector(cache *cache.Cache) prometheus.Collector {
 type SpeedtestOpts struct {
 	Server           string
 	ShowServerLabels bool
+	Interval         time.Duration
 }
 
 // NewSpeedtestCollectorWithOpts returns a collector, with a specified ServerID
@@ -112,6 +116,7 @@ func NewSpeedtestCollectorWithOpts(cache *cache.Cache, opts SpeedtestOpts) prome
 	}
 
 	collector.showServerLabels = opts.ShowServerLabels
+	collector.interval = opts.Interval
 
 	if opts.Server != "" {
 		collector.serverID = opts.Server
@@ -172,22 +177,49 @@ func (c *speedtestCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (c *speedtestCollector) cachedOrCollect() (SpeedtestResult, error) {
-	cold, ok := c.cache.Get("result")
-	if ok {
-		log.Debug().Msg("returning results from cache")
-		return cold.(SpeedtestResult), nil
+	val, ok := c.cache.Get("result")
+	if !ok {
+		return c.collectAndCache()
 	}
 
-	hot, err := c.collect()
-	if err != nil {
-		return hot, err
+	res := val.(SpeedtestResult)
+	if time.Since(res.Timestamp) > c.interval {
+		go func() {
+			c.mutex.Lock()
+			if c.updating {
+				c.mutex.Unlock()
+				return
+			}
+			c.updating = true
+			c.mutex.Unlock()
+
+			defer func() {
+				c.mutex.Lock()
+				c.updating = false
+				c.mutex.Unlock()
+			}()
+
+			if _, err := c.collectAndCache(); err != nil {
+				slog.Error("failed to update cache in background")
+			}
+		}()
 	}
-	c.cache.Set("result", hot, cache.DefaultExpiration)
-	return hot, nil
+
+	slog.Debug("returning results from cache")
+	return res, nil
+}
+
+func (c *speedtestCollector) collectAndCache() (SpeedtestResult, error) {
+	res, err := c.collect()
+	if err != nil {
+		return res, err
+	}
+	c.cache.Set("result", res, cache.NoExpiration)
+	return res, nil
 }
 
 func (c *speedtestCollector) collect() (SpeedtestResult, error) {
-	log.Debug().Msg("running speedtest")
+	slog.Debug("running speedtest")
 
 	cmdParams := []string{"--accept-license", "--accept-gdpr", "--format", "json", "--unit", "B/s"}
 	if c.serverID != "" {
@@ -201,12 +233,12 @@ func (c *speedtestCollector) collect() (SpeedtestResult, error) {
 	if err := cmd.Run(); err != nil {
 		return SpeedtestResult{}, fmt.Errorf("speedtest failed: %w", err)
 	}
-	log.Debug().Msgf("speedtest result: %s", out.String())
+	slog.Debug("speedtest result", "output", out.String())
 	var result SpeedtestResult
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
 		return SpeedtestResult{}, fmt.Errorf("failed to decode speedtest output: %w", err)
 	}
-	log.Info().Msgf("recorded %s", result.Result.URL)
+	slog.Info("recorded speedtest result", "url", result.Result.URL)
 	return result, nil
 }
 

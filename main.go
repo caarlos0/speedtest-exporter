@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -37,20 +38,21 @@ func main() {
 	}
 	if *debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-		log.Debug().Msg("enabled debug mode")
+		slog.Debug("enabled debug mode")
 	}
 
 	if *server != "" {
-		log.Info().Msgf("starting speedtest-exporter %s with server %s", version, *server)
+		slog.Info("starting speedtest-exporter", "version", version, "server", *server)
 	} else {
-		log.Info().Msgf("starting speedtest-exporter %s", version)
+		slog.Info("starting speedtest-exporter", "version", version)
 	}
 	prometheus.MustRegister(
 		collector.NewSpeedtestCollectorWithOpts(
-			cache.New(*interval, *interval),
+			cache.New(*interval, cache.NoExpiration),
 			collector.SpeedtestOpts{
 				Server:           *server,
 				ShowServerLabels: *serverLabels,
+				Interval:         *interval,
 			},
 		),
 	)
@@ -70,8 +72,8 @@ func main() {
 			`,
 		)
 	})
-	log.Info().Msgf("listening on %s", *bind)
+	slog.Info("listening on", "bind", *bind)
 	if err := http.ListenAndServe(*bind, nil); err != nil {
-		log.Fatal().Err(err).Msg("error starting server")
+		slog.Error("error starting server")
 	}
 }
