@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/rs/zerolog/log"
 )
 
 type speedtestCollector struct {
@@ -30,6 +30,8 @@ type speedtestCollector struct {
 
 	serverID         string
 	showServerLabels bool
+	interval         time.Duration
+	updating         bool // effectively a mutex for background updates
 }
 
 // NewSpeedtestCollector returns a releases collector
@@ -42,6 +44,7 @@ func NewSpeedtestCollector(cache *cache.Cache) prometheus.Collector {
 type SpeedtestOpts struct {
 	Server           string
 	ShowServerLabels bool
+	Interval         time.Duration
 }
 
 // NewSpeedtestCollectorWithOpts returns a collector, with a specified ServerID
@@ -112,6 +115,7 @@ func NewSpeedtestCollectorWithOpts(cache *cache.Cache, opts SpeedtestOpts) prome
 	}
 
 	collector.showServerLabels = opts.ShowServerLabels
+	collector.interval = opts.Interval
 
 	if opts.Server != "" {
 		collector.serverID = opts.Server
@@ -149,7 +153,7 @@ func (c *speedtestCollector) Collect(ch chan<- prometheus.Metric) {
 	result, err := c.cachedOrCollect()
 	if err != nil {
 		success = 0
-		log.Error().Err(err).Msg("failed to collect")
+		log.Error("failed to collect", "err", err)
 	}
 
 	var labels []string
@@ -166,28 +170,55 @@ func (c *speedtestCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(c.uploadBytes, prometheus.GaugeValue, result.Upload.Bandwidth, labels...)
 	ch <- prometheus.MustNewConstMetric(c.latencySeconds, prometheus.GaugeValue, result.Ping.Latency/1000, labels...)
 	ch <- prometheus.MustNewConstMetric(c.jitterSeconds, prometheus.GaugeValue, result.Ping.Jitter/1000, labels...)
-	ch <- prometheus.MustNewConstMetric(c.uploadedBytes, prometheus.GaugeValue, result.Download.Bytes, labels...)
-	ch <- prometheus.MustNewConstMetric(c.downloadedBytes, prometheus.GaugeValue, result.Upload.Bytes, labels...)
+	ch <- prometheus.MustNewConstMetric(c.uploadedBytes, prometheus.GaugeValue, result.Upload.Bytes, labels...)
+	ch <- prometheus.MustNewConstMetric(c.downloadedBytes, prometheus.GaugeValue, result.Download.Bytes, labels...)
 	ch <- prometheus.MustNewConstMetric(c.packetLossPct, prometheus.GaugeValue, result.PacketLoss, labels...)
 }
 
 func (c *speedtestCollector) cachedOrCollect() (SpeedtestResult, error) {
-	cold, ok := c.cache.Get("result")
-	if ok {
-		log.Debug().Msg("returning results from cache")
-		return cold.(SpeedtestResult), nil
+	val, ok := c.cache.Get("result")
+	if !ok {
+		return c.collectAndCache()
 	}
 
-	hot, err := c.collect()
-	if err != nil {
-		return hot, err
+	res := val.(SpeedtestResult)
+	if time.Since(res.Timestamp) > c.interval {
+		go func() {
+			c.mutex.Lock()
+			if c.updating {
+				c.mutex.Unlock()
+				return
+			}
+			c.updating = true
+			c.mutex.Unlock()
+
+			defer func() {
+				c.mutex.Lock()
+				c.updating = false
+				c.mutex.Unlock()
+			}()
+
+			if _, err := c.collectAndCache(); err != nil {
+				log.Error("failed to update cache in background", "err", err)
+			}
+		}()
 	}
-	c.cache.Set("result", hot, cache.DefaultExpiration)
-	return hot, nil
+
+	log.Debug("returning results from cache")
+	return res, nil
+}
+
+func (c *speedtestCollector) collectAndCache() (SpeedtestResult, error) {
+	res, err := c.collect()
+	if err != nil {
+		return res, err
+	}
+	c.cache.Set("result", res, cache.NoExpiration)
+	return res, nil
 }
 
 func (c *speedtestCollector) collect() (SpeedtestResult, error) {
-	log.Debug().Msg("running speedtest")
+	log.Debug("running speedtest")
 
 	cmdParams := []string{"--accept-license", "--accept-gdpr", "--format", "json", "--unit", "B/s"}
 	if c.serverID != "" {
@@ -201,12 +232,12 @@ func (c *speedtestCollector) collect() (SpeedtestResult, error) {
 	if err := cmd.Run(); err != nil {
 		return SpeedtestResult{}, fmt.Errorf("speedtest failed: %w", err)
 	}
-	log.Debug().Msgf("speedtest result: %s", out.String())
+	log.Debugf("speedtest result: %s", out.String())
 	var result SpeedtestResult
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
 		return SpeedtestResult{}, fmt.Errorf("failed to decode speedtest output: %w", err)
 	}
-	log.Info().Msgf("recorded %s", result.Result.URL)
+	log.Infof("recorded %s", result.Result.URL)
 	return result, nil
 }
 

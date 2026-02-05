@@ -3,15 +3,13 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/alecthomas/kingpin"
 	"github.com/caarlos0/speedtest-exporter/collector"
+	"github.com/charmbracelet/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 // nolint: gochecknoglobals
@@ -31,26 +29,28 @@ func main() {
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	if *format == "console" {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log.SetLevel(log.InfoLevel)
+	if *format == "json" {
+		log.SetFormatter(log.JSONFormatter)
 	}
+
 	if *debug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-		log.Debug().Msg("enabled debug mode")
+		log.SetLevel(log.DebugLevel)
+		log.Debug("enabled debug mode")
 	}
 
 	if *server != "" {
-		log.Info().Msgf("starting speedtest-exporter %s with server %s", version, *server)
+		log.Infof("starting speedtest-exporter %s with server %s", version, *server)
 	} else {
-		log.Info().Msgf("starting speedtest-exporter %s", version)
+		log.Infof("starting speedtest-exporter %s", version)
 	}
 	prometheus.MustRegister(
 		collector.NewSpeedtestCollectorWithOpts(
-			cache.New(*interval, *interval),
+			cache.New(*interval, cache.NoExpiration),
 			collector.SpeedtestOpts{
 				Server:           *server,
 				ShowServerLabels: *serverLabels,
+				Interval:         *interval,
 			},
 		),
 	)
@@ -70,8 +70,8 @@ func main() {
 			`,
 		)
 	})
-	log.Info().Msgf("listening on %s", *bind)
+	log.Infof("listening on %s", *bind)
 	if err := http.ListenAndServe(*bind, nil); err != nil {
-		log.Fatal().Err(err).Msg("error starting server")
+		log.Fatal("error starting server", "err", err)
 	}
 }
