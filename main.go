@@ -22,6 +22,8 @@ var (
 	interval     = kingpin.Flag("refresh.interval", "time between refreshes with speedtest").Default("30m").Duration()
 	server       = kingpin.Flag("server", "speedtest server id").Short('s').Default("").String()
 	serverLabels = kingpin.Flag("showServerLabels", "whether or not to annotate speedtest results with details of the server").Default("false").Bool()
+	hInterface   = kingpin.Flag("interface", "Attempt to bind to the specified interface when connecting to servers").Short('I').Default("").String()
+	ip           = kingpin.Flag("ip", "Attempt to bind to the specified IP address when connecting to servers").Short('i').Default("").String()
 
 	version = "master"
 )
@@ -50,6 +52,8 @@ func main() {
 			cache.New(*interval, *interval),
 			collector.SpeedtestOpts{
 				Server:           *server,
+				Interface:        *hInterface,
+				Ip:               *ip,
 				ShowServerLabels: *serverLabels,
 			},
 		),
