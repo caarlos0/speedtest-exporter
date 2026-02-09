@@ -29,6 +29,8 @@ type speedtestCollector struct {
 	packetLossPct   *prometheus.Desc
 
 	serverID         string
+	hostInterface    string
+	ip               string
 	showServerLabels bool
 }
 
@@ -41,6 +43,8 @@ func NewSpeedtestCollector(cache *cache.Cache) prometheus.Collector {
 // Use an Opts struct to enable future extensions to this if needed
 type SpeedtestOpts struct {
 	Server           string
+	Interface        string
+	Ip               string
 	ShowServerLabels bool
 }
 
@@ -115,6 +119,14 @@ func NewSpeedtestCollectorWithOpts(cache *cache.Cache, opts SpeedtestOpts) prome
 
 	if opts.Server != "" {
 		collector.serverID = opts.Server
+	}
+
+	if opts.Interface != "" {
+		collector.hostInterface = opts.Interface
+	}
+
+	if opts.Ip != "" {
+		collector.ip = opts.Ip
 	}
 
 	return collector
@@ -192,6 +204,12 @@ func (c *speedtestCollector) collect() (SpeedtestResult, error) {
 	cmdParams := []string{"--accept-license", "--accept-gdpr", "--format", "json", "--unit", "B/s"}
 	if c.serverID != "" {
 		cmdParams = append(cmdParams, "-s", c.serverID)
+	}
+	if c.hostInterface != "" {
+		cmdParams = append(cmdParams, "-I", c.hostInterface)
+	}
+	if c.ip != "" {
+		cmdParams = append(cmdParams, "-i", c.ip)
 	}
 
 	cmd := exec.Command("speedtest", cmdParams...)
